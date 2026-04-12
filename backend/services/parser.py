@@ -89,14 +89,14 @@ def parse_sections(text: str) -> dict[str, list]:
     current_section = "other"
     current_items: list[str] = []
     
-    section_keywords = {
-        "experience": ["experience", "work history", "employment", "professional experience"],
-        "education": ["education", "academic", "degree", "university", "college"],
-        "skills": ["skills", "technical skills", "competencies", "technologies"],
-        "certifications": ["certification", "certifications", "license", "licenses"],
-        "projects": ["projects", "personal projects", "portfolio"],
-        "summary": ["summary", "objective", "profile"],
-    }
+    section_keywords = [
+        ("summary", ["summary", "objective", "profile"]),
+        ("experience", ["experience", "work history", "employment", "professional experience"]),
+        ("education", ["education", "academic", "degree", "university", "college"]),
+        ("skills", ["skills", "technical skills", "competencies", "technologies"]),
+        ("certifications", ["certification", "certifications", "license", "licenses"]),
+        ("projects", ["projects", "personal projects", "portfolio"]),
+    ]
     
     for line in lines:
         line_stripped = line.strip()
@@ -104,8 +104,9 @@ def parse_sections(text: str) -> dict[str, list]:
             continue
         
         is_section_header = False
-        for section_name, keywords in section_keywords.items():
-            if any(keyword.lower() in line_stripped.lower() for keyword in keywords):
+        for section_name, keywords in section_keywords:
+            if any(line_stripped.lower() == keyword.lower() for keyword in keywords) or \
+               any(line_stripped.lower().startswith(keyword.lower() + ":") for keyword in keywords):
                 if current_items:
                     if current_section == "skills":
                         sections[current_section] = current_items

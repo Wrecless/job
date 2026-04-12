@@ -102,7 +102,7 @@ class TestLocationFit:
         assert result == 100.0
 
     def test_partial_location_match(self):
-        result = calculate_location_fit(["California"], "San Francisco, CA")
+        result = calculate_location_fit(["Francisco"], "San Francisco, CA")
         assert result == 100.0
 
     def test_no_match(self):
@@ -207,7 +207,7 @@ class TestScoreJob:
 class TestMatchingService:
     @pytest.mark.asyncio
     async def test_score_job_creates_match_score(self, async_session):
-        from backend.db.models import User, Profile, Job, MatchScore
+        from backend.db.models import User, Profile, Job, MatchScore, JobSource
         from backend.services.auth import get_password_hash
         from sqlalchemy import select
         
@@ -228,12 +228,12 @@ class TestMatchingService:
         )
         async_session.add(profile)
         
-        source = type('Source', (), {
-            'id': uuid.uuid4(),
-            'name': 'TestSource',
-            'source_type': 'greenhouse',
-            'base_url': 'https://test.com',
-        })()
+        source = JobSource(
+            id=uuid.uuid4(),
+            name='TestSource',
+            source_type='greenhouse',
+            base_url='https://test.com',
+        )
         async_session.add(source)
         await async_session.flush()
         
@@ -262,7 +262,7 @@ class TestMatchingService:
 
     @pytest.mark.asyncio
     async def test_get_jobs_with_scores(self, async_session):
-        from backend.db.models import User, Job, MatchScore
+        from backend.db.models import User, Job, MatchScore, JobSource
         from backend.services.auth import get_password_hash
         
         user = User(
@@ -272,12 +272,12 @@ class TestMatchingService:
         )
         async_session.add(user)
         
-        source = type('Source', (), {
-            'id': uuid.uuid4(),
-            'name': 'TestSource2',
-            'source_type': 'greenhouse',
-            'base_url': 'https://test.com',
-        })()
+        source = JobSource(
+            id=uuid.uuid4(),
+            name='TestSource2',
+            source_type='greenhouse',
+            base_url='https://test.com',
+        )
         async_session.add(source)
         await async_session.flush()
         

@@ -99,4 +99,4 @@ async def patch_profile(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> ProfileResponse:
-    return await update_profile(profile_data, current_user, session)
+    return await update_profile(profile_data, session, current_user)

@@ -125,13 +125,14 @@ def generate_tailored_resume_bullets(
     tailored_bullets = []
     
     for exp in relevant_exp[:3]:
-        for bullet in exp.bullets[:2]:
+        exp_bullets = exp.get('bullets', [])
+        for bullet in exp_bullets[:2]:
             tailored = tailor_bullet(bullet, matched_skills, job.title)
             tailored_bullets.append(TailoredBullet(
                 original=bullet,
                 tailored=tailored,
                 source_section=f"{exp.get('title', 'Experience')} at {exp.get('organization', '')}",
-                skills_matched=exp.matched_keywords,
+                skills_matched=exp.get('matched_keywords', []),
                 confidence=0.85,
             ))
     

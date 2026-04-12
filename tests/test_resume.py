@@ -3,11 +3,9 @@ import uuid
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from httpx import AsyncClient, ASGITransport
 
 from backend.main import app
-from backend.db.base import Base
 from backend.db.models import User, Resume
 from backend.services.auth import get_password_hash, create_access_token
 from backend.services.parser import (
@@ -65,8 +63,8 @@ John Doe
 john@example.com
 (555) 123-4567
 
-Summary
-Experienced software engineer with 5 years of experience.
+Profile
+Software engineer with 5 years of experience.
 
 Experience
 Senior Software Engineer at Tech Corp
@@ -100,19 +98,6 @@ john@example.com
 
 
 @pytest.fixture
-async def async_session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-    
-    await engine.dispose()
-
-
-@pytest.fixture
 def test_user():
     return User(
         id=uuid.uuid4(),
@@ -124,15 +109,16 @@ def test_user():
 class TestResumeRoutes:
     @pytest.mark.asyncio
     async def test_upload_resume_requires_auth(self, async_session):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/resumes/",
                 files={"file": ("test.pdf", b"fake pdf content", "application/pdf")},
                 data={"version_name": "Test Resume"},
@@ -143,7 +129,7 @@ class TestResumeRoutes:
 
     @pytest.mark.asyncio
     async def test_upload_invalid_file_type(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -151,12 +137,13 @@ class TestResumeRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/resumes/",
                 files={"file": ("test.txt", b"text content", "text/plain")},
                 data={"version_name": "Test Resume"},
@@ -169,7 +156,7 @@ class TestResumeRoutes:
 
     @pytest.mark.asyncio
     async def test_list_resumes_empty(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -177,12 +164,13 @@ class TestResumeRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            response = client.get(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
                 "/resumes/",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -193,7 +181,7 @@ class TestResumeRoutes:
 
     @pytest.mark.asyncio
     async def test_get_resume_not_found(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -201,13 +189,14 @@ class TestResumeRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         fake_id = uuid.uuid4()
         
-        with TestClient(app) as client:
-            response = client.get(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
                 f"/resumes/{fake_id}",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -217,7 +206,7 @@ class TestResumeRoutes:
 
     @pytest.mark.asyncio
     async def test_delete_resume_not_found(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -225,13 +214,14 @@ class TestResumeRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         fake_id = uuid.uuid4()
         
-        with TestClient(app) as client:
-            response = client.delete(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.delete(
                 f"/resumes/{fake_id}",
                 headers={"Authorization": f"Bearer {token}"},
             )

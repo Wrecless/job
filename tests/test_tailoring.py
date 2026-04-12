@@ -115,8 +115,7 @@ class TestGenerateTailoredResumeBullets:
         resume = {
             "experience": [
                 {
-                    "title": "Software Engineer",
-                    "organization": "Tech Corp",
+                    "description": "Built API with Python at Tech Corp",
                     "bullets": ["Built API with Python", "Deployed with Docker"],
                 }
             ],
@@ -137,8 +136,7 @@ class TestGenerateTailoredResumeBullets:
         resume = {
             "experience": [
                 {
-                    "title": "Developer",
-                    "organization": "Co",
+                    "description": "Did some stuff at Co",
                     "bullets": ["Did some stuff"],
                 }
             ],
@@ -195,14 +193,14 @@ class TestCoverLetterGeneration:
             ],
             "skills": ["Python"],
         }
-        body = generate_cover_letter_body(resume, {"title": "Engineer", "company": "Co"}, ["python"])
+        job = type('Job', (), {"title": "Engineer", "company": "Co"})()
+        body = generate_cover_letter_body(job, resume, ["python"])
         assert len(body) > 0
         assert "Old Co" in body[0]["content"]
 
     def test_closing_generation(self):
-        closing, prompt = generate_cover_letter_closing(
-            type('Job', (), {"title": "Engineer", "company": "Tech Corp"})()
-        )
+        job = type('Job', (), {"title": "Engineer", "company": "Tech Corp"})()
+        closing, prompt = generate_cover_letter_closing(job, "Tech Corp")
         assert "Tech Corp" in closing
         assert "Engineer" in closing
 

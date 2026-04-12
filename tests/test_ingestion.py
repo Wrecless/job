@@ -3,11 +3,9 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from httpx import AsyncClient, ASGITransport
 
 from backend.main import app
-from backend.db.base import Base
 from backend.db.models import User, JobSource, Job
 from backend.services.auth import get_password_hash, create_access_token
 from backend.services.ingestion import (
@@ -86,19 +84,6 @@ class TestConnectors:
         
         assert normalized["salary_min"] == 150000
         assert normalized["salary_max"] == 200000
-
-
-@pytest.fixture
-async def async_session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-    
-    await engine.dispose()
 
 
 @pytest.fixture
@@ -200,15 +185,16 @@ class TestSourceRegistry:
 class TestSourceRoutes:
     @pytest.mark.asyncio
     async def test_create_source_requires_auth(self, async_session):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/sources/",
                 json={"name": "Test", "source_type": "greenhouse", "base_url": "https://test.com"},
             )
@@ -218,7 +204,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_list_sources(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -226,12 +212,13 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            response = client.get(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
                 "/sources/",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -242,7 +229,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_create_source(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -250,12 +237,13 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/sources/",
                 json={
                     "name": "MyGreenhouse",
@@ -273,7 +261,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_get_source(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -281,18 +269,19 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.post(
                 "/sources/",
                 json={"name": "GetTest", "source_type": "lever", "base_url": "https://test.com"},
                 headers={"Authorization": f"Bearer {token}"},
             )
             
-            response = client.get(
+            response = await client.get(
                 "/sources/GetTest",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -303,7 +292,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_get_source_not_found(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -311,12 +300,13 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            response = client.get(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
                 "/sources/NonExistent",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -326,7 +316,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_toggle_source(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -334,18 +324,19 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.post(
                 "/sources/",
                 json={"name": "ToggleTest", "source_type": "greenhouse", "base_url": "https://test.com"},
                 headers={"Authorization": f"Bearer {token}"},
             )
             
-            response = client.patch(
+            response = await client.patch(
                 "/sources/ToggleTest/toggle?is_active=false",
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -356,7 +347,7 @@ class TestSourceRoutes:
 
     @pytest.mark.asyncio
     async def test_delete_source(self, async_session, test_user):
-        from backend.db.base import async_session as db_session
+        from backend.db.base import get_session
         
         async_session.add(test_user)
         await async_session.commit()
@@ -364,18 +355,19 @@ class TestSourceRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
         token = create_access_token(test_user.id)
         
-        with TestClient(app) as client:
-            client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.post(
                 "/sources/",
                 json={"name": "DeleteTest", "source_type": "lever", "base_url": "https://test.com"},
                 headers={"Authorization": f"Bearer {token}"},
             )
             
-            response = client.delete(
+            response = await client.delete(
                 "/sources/DeleteTest",
                 headers={"Authorization": f"Bearer {token}"},
             )
