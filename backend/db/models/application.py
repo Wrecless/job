@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, UniqueConstraint, Index, func
+from sqlalchemy import String, DateTime, ForeignKey, UniqueConstraint, Index, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.db.base import Base
 
@@ -21,19 +21,19 @@ APPLICATION_STATUSES = [
 class Application(Base):
     __tablename__ = "applications"
 
-    id: Mapped[uuid.UUID] = mapped_column(CHAR(36), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("users.id"),
         nullable=False,
     )
     job_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("jobs.id"),
         nullable=False,
     )
     resume_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("resumes.id"),
         nullable=False,
     )
@@ -62,8 +62,12 @@ class Application(Base):
     user: Mapped["User"] = relationship("User", back_populates="applications")
     job: Mapped["Job"] = relationship("Job", back_populates="applications")
     resume: Mapped["Resume"] = relationship("Resume", back_populates="applications")
+    tasks: Mapped[list["Task"]] = relationship("Task", back_populates="application")
+    artifacts: Mapped[list["ApplicationArtifact"]] = relationship("ApplicationArtifact", back_populates="application")
 
 
 from backend.db.models.user import User
 from backend.db.models.job import Job
 from backend.db.models.resume import Resume
+from backend.db.models.task import Task
+from backend.db.models.artifact import ApplicationArtifact

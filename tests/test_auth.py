@@ -5,10 +5,8 @@ from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from backend.main import app
-from backend.db.base import Base
 from backend.db.models import User
 from backend.services.auth import (
     get_password_hash,
@@ -18,19 +16,6 @@ from backend.services.auth import (
     verify_access_token,
     verify_refresh_token,
 )
-
-
-@pytest.fixture
-async def async_session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-    
-    await engine.dispose()
 
 
 @pytest.fixture
@@ -115,15 +100,17 @@ class TestJWTTokens:
 class TestAuthRoutes:
     @pytest.mark.asyncio
     async def test_register_success(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/register",
                 json={"email": "new@example.com", "password": "securepassword123"},
             )
@@ -138,7 +125,8 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         user = User(
             id=uuid.uuid4(),
@@ -151,10 +139,11 @@ class TestAuthRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/register",
                 json={"email": "existing@example.com", "password": "password123"},
             )
@@ -166,7 +155,8 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_login_success(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         user = User(
             id=uuid.uuid4(),
@@ -179,10 +169,11 @@ class TestAuthRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/login",
                 json={"email": "login@example.com", "password": "loginpassword"},
             )
@@ -196,7 +187,8 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_login_wrong_password(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         user = User(
             id=uuid.uuid4(),
@@ -209,10 +201,11 @@ class TestAuthRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/login",
                 json={"email": "wrongpass@example.com", "password": "wrongpassword"},
             )
@@ -224,15 +217,17 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_login_nonexistent_user(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/login",
                 json={"email": "nonexistent@example.com", "password": "anypassword"},
             )
@@ -243,7 +238,8 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_refresh_token_success(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         user = User(
             id=uuid.uuid4(),
@@ -258,10 +254,11 @@ class TestAuthRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/refresh",
                 json={"refresh_token": refresh_token},
             )
@@ -275,15 +272,17 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_refresh_token_invalid(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.post(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
                 "/auth/refresh",
                 json={"refresh_token": "invalid.token.here"},
             )
@@ -294,15 +293,17 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_protected_route_without_token(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.get("/auth/me")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/auth/me")
         
         assert response.status_code == 401
         
@@ -310,7 +311,8 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_protected_route_with_valid_token(self, async_session):
-        from backend.db.base import async_session as db_session
+        from httpx import AsyncClient, ASGITransport
+        from backend.db.base import get_session
         
         user = User(
             id=uuid.uuid4(),
@@ -325,10 +327,11 @@ class TestAuthRoutes:
         async def override_get_session():
             yield async_session
         
-        app.dependency_overrides[db_session] = override_get_session
+        app.dependency_overrides[get_session] = override_get_session
         
-        with TestClient(app) as client:
-            response = client.get(
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
                 "/auth/me",
                 headers={"Authorization": f"Bearer {access_token}"},
             )

@@ -1,9 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.types import CHAR
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, DateTime, func, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.db.base import Base
 
 
@@ -15,7 +13,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         primary_key=True,
         default=generate_uuid,
     )
@@ -33,6 +31,11 @@ class User(Base):
         onupdate=func.now(),
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    profile: Mapped["Profile"] = relationship("Profile", back_populates="user", uselist=False)
+    resumes: Mapped[list["Resume"]] = relationship("Resume", back_populates="user")
+    match_scores: Mapped[list["MatchScore"]] = relationship("MatchScore", back_populates="user")
+    applications: Mapped[list["Application"]] = relationship("Application", back_populates="user")
 
     def is_deleted(self) -> bool:
         return self.deleted_at is not None

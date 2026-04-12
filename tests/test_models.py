@@ -1,28 +1,11 @@
 import pytest
 import uuid
 from datetime import datetime
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 
 from backend.db.models import (
     User, Profile, Resume, JobSource, Job, MatchScore,
     Application, ApplicationArtifact, Task, AuditLog
 )
-
-Base = declarative_base()
-
-
-@pytest.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-    
-    await engine.dispose()
 
 
 @pytest.mark.asyncio

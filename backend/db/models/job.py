@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, Text, ForeignKey, UniqueConstraint, Index, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, DateTime, Integer, Text, ForeignKey, UniqueConstraint, Index, func, Uuid
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.db.base import Base
 
@@ -9,9 +9,9 @@ from backend.db.base import Base
 class Job(Base):
     __tablename__ = "jobs"
 
-    id: Mapped[uuid.UUID] = mapped_column(CHAR(36), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     source_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("job_sources.id"),
         nullable=False,
     )
@@ -25,13 +25,13 @@ class Job(Base):
     employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     seniority: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    skills_required: Mapped[list] = mapped_column(JSONB, default=list)
-    benefits: Mapped[list] = mapped_column(JSONB, default=list)
+    skills_required: Mapped[list] = mapped_column(JSON, default=list)
+    benefits: Mapped[list] = mapped_column(JSON, default=list)
     application_url: Mapped[str] = mapped_column(String(500), nullable=False)
     source_url: Mapped[str] = mapped_column(String(500), nullable=False)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    raw_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     canonical_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -53,6 +53,10 @@ class Job(Base):
     )
 
     source: Mapped["JobSource"] = relationship("JobSource", back_populates="jobs")
+    match_scores: Mapped[list["MatchScore"]] = relationship("MatchScore", back_populates="job")
+    applications: Mapped[list["Application"]] = relationship("Application", back_populates="job")
 
 
 from backend.db.models.job_source import JobSource
+from backend.db.models.match import MatchScore
+from backend.db.models.application import Application

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, DECIMAL, ForeignKey, UniqueConstraint, Index, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, DateTime, DECIMAL, ForeignKey, UniqueConstraint, Index, func, Uuid
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.db.base import Base
 
@@ -9,19 +9,19 @@ from backend.db.base import Base
 class MatchScore(Base):
     __tablename__ = "match_scores"
 
-    id: Mapped[uuid.UUID] = mapped_column(CHAR(36), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     job_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("jobs.id"),
         nullable=False,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        CHAR(36),
+        Uuid,
         ForeignKey("users.id"),
         nullable=False,
     )
     score_total: Mapped[float] = mapped_column(DECIMAL(5, 2), nullable=False)
-    score_breakdown: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    score_breakdown: Mapped[dict] = mapped_column(JSON, nullable=False)
     explanation: Mapped[str] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
