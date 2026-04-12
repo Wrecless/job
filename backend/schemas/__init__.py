@@ -1,9 +1,14 @@
+from backend.schemas.matching import (
+    ScoreBreakdown,
+    MatchScoreResponse,
+    JobWithMatch,
+    JobListResponse,
+)
 from backend.schemas.resume import (
     ResumeCreate,
     ResumeResponse,
     ResumeListResponse,
     ParsedResume,
-    ResumeSection,
 )
 from backend.schemas.profile import (
     ProfileCreate,
@@ -12,11 +17,14 @@ from backend.schemas.profile import (
 )
 
 __all__ = [
+    "ScoreBreakdown",
+    "MatchScoreResponse",
+    "JobWithMatch",
+    "JobListResponse",
     "ResumeCreate",
     "ResumeResponse",
     "ResumeListResponse",
     "ParsedResume",
-    "ResumeSection",
     "ProfileCreate",
     "ProfileUpdate",
     "ProfileResponse",

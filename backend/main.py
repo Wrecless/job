@@ -5,7 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import get_settings
 from backend.db.base import engine, Base
-from backend.api import auth
+from backend.api import auth, resume_router, profile_router
+from backend.api.sources import router as sources_router
+from backend.api.jobs import router as jobs_router
+from backend.api.tailoring import router as tailoring_router
+from backend.api.applications import router as applications_router
 
 
 @asynccontextmanager
@@ -34,6 +38,12 @@ def create_app() -> FastAPI:
     )
     
     app.include_router(auth.router)
+    app.include_router(resume_router)
+    app.include_router(profile_router)
+    app.include_router(sources_router)
+    app.include_router(jobs_router)
+    app.include_router(tailoring_router)
+    app.include_router(applications_router)
     
     @app.get("/health")
     async def health():
