@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models import User, Profile, Resume, Job, ApplicationArtifact
+from backend.services.ai import generate_ai_content
 
 
 def extract_keywords(text: str) -> set[str]:
@@ -159,66 +160,180 @@ def generate_summary_suggestion(
     return f"Looking to apply strong {', '.join(matched_skills[:3])} skills as {job_title}."
 
 
-def generate_cover_letter_intro(
+async def generate_ai_summary(
+    resume: dict,
+    job: dict,
+    profile: dict,
+) -> str:
+    system_prompt = """You are a professional resume writer. Write compelling professional summaries.
+Keep it to 3-4 sentences. Highlight relevant experience and skills.
+Use active voice and specific accomplishments when possible."""
+    
+    skills = resume.get("skills", [])[:5]
+    experience = resume.get("experience", [])
+    exp_summary = ""
+    if experience:
+        first_exp = experience[0]
+        exp_summary = f" {first_exp.get('title', 'Experience')} at {first_exp.get('organization', '')}"
+    
+    prompt = f"""Write a professional summary for a {job.get('title', 'role')} applicant at {job.get('company', 'a company')}.
+Current summary: {resume.get('summary', 'None provided')}
+Experience: {exp_summary}
+Key skills: {', '.join(skills)}
+"""
+    if profile.get("headline"):
+        prompt += f"Profile: {profile['headline']}\n"
+    
+    content = await generate_ai_content(prompt, system_prompt)
+    if content:
+        return content.strip()
+    
+    return generate_summary_suggestion(
+        resume.get("summary"),
+        job.get("title", "Role"),
+        job.get("company", "Company"),
+        skills,
+    )
+
+
+async def generate_ai_tailored_bullet(
+    original_bullet: str,
+    job: dict,
+    matched_skills: list[str],
+) -> str:
+    system_prompt = """You are a professional resume writer. Tailor resume bullet points to job descriptions.
+Keep the same format and length. Add quantifiable metrics if possible.
+Focus on the skills mentioned in the job requirements."""
+    
+    skills_str = ", ".join(matched_skills[:5]) if matched_skills else "relevant skills"
+    
+    prompt = f"""Tailor this resume bullet point for a {job.get('title', 'role')} position:
+Original: {original_bullet}
+Job requirements mention: {skills_str}
+Focus on: {job.get('description', '')[:300]}
+
+Provide only the tailored bullet point."""
+    
+    content = await generate_ai_content(prompt, system_prompt)
+    if content:
+        return content.strip()
+    
+    return original_bullet
+
+
+async def generate_cover_letter_intro(
     job: dict,
     profile: dict,
 ) -> tuple[str, str]:
-    prompt = f"Write a professional cover letter opening for a {job.title} position at {job.company}."
+    system_prompt = """You are a professional career coach writing cover letters. 
+Write compelling, authentic cover letter openings. Be specific and avoid generic phrases.
+Keep it to 2-3 sentences maximum."""
     
-    intro = f"I am excited to apply for the {job.title} position at {job.company}."
+    prompt = f"""Write a professional opening paragraph for a cover letter for a {job.get('title', 'role')} position at {job.get('company', 'the company')}.
+"""
+    if profile.get("headline"):
+        prompt += f"The applicant is: {profile['headline']}.\n"
+    prompt += "Write only the paragraph, no greeting or signature."
     
+    content = await generate_ai_content(prompt, system_prompt)
+    
+    if content:
+        return content.strip(), prompt
+    
+    intro = f"I am excited to apply for the {job.get('title', 'role')} position at {job.get('company', 'the company')}."
     if profile.get("headline"):
         intro += f" With my background as a {profile['headline']},"
-    
     intro += " I bring a strong combination of technical skills and proven experience that aligns well with this role."
-    
     return intro, prompt
 
 
-def generate_cover_letter_body(
+async def generate_cover_letter_body(
     job: dict,
     resume: dict,
     matched_skills: list[str],
 ) -> list[dict]:
     body_sections = []
     
-    prompt1 = f"Write a paragraph highlighting relevant experience with {', '.join(matched_skills[:3])} for a {job.title} role."
+    system_prompt = """You are a professional career coach writing cover letters.
+Write specific, quantifiable achievements. Avoid generic statements.
+Each paragraph should focus on one key accomplishment."""
     
-    if resume.get("experience"):
-        first_exp = resume["experience"][0]
+    experience_items = resume.get("experience", [])
+    skills_str = ", ".join(matched_skills[:4]) if matched_skills else "relevant technical skills"
+    
+    prompt = f"""Write 2-3 short paragraphs for a cover letter body highlighting:
+1. Specific experience with {skills_str}
+2. A key achievement with quantifiable results if possible
+3. How the candidate's background matches the {job.get('title', 'role')} requirements
+
+Candidate's relevant experience:
+"""
+    for exp in experience_items[:3]:
+        title = exp.get("title", "Role")
+        org = exp.get("organization", "Company")
+        bullets = exp.get("bullets", [])
+        prompt += f"\n- {title} at {org}"
+        if bullets:
+            prompt += f": {'; '.join(bullets[:2])}"
+    
+    prompt += "\n\nWrite only the paragraphs, no introduction or conclusion."
+    
+    content = await generate_ai_content(prompt, system_prompt)
+    
+    if content:
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+        for i, para in enumerate(paragraphs):
+            body_sections.append({
+                "content": para,
+                "prompt_used": prompt,
+            })
+        return body_sections
+    
+    prompt1 = f"Write a paragraph highlighting relevant experience with {skills_str} for a {job.get('title', 'role')} role."
+    if experience_items:
+        first_exp = experience_items[0]
         org = first_exp.get("organization", "my previous position")
         body_sections.append({
-            "content": f"In my role at {org}, I developed hands-on expertise in {', '.join(matched_skills[:2])}, skills directly applicable to this position.",
+            "content": f"In my role at {org}, I developed hands-on expertise in {skills_str}, skills directly applicable to this position.",
             "prompt_used": prompt1,
         })
     
     prompt2 = f"Write a paragraph about achievements with {matched_skills[0] if matched_skills else 'technical skills'}."
-    
-    if resume.get("experience"):
-        for exp in resume["experience"][:2]:
-            bullets = exp.get("bullets", [])
-            if bullets:
-                body_sections.append({
-                    "content": f"Key achievement: {bullets[0][:150]}...",
-                    "prompt_used": prompt2,
-                })
-                break
+    for exp in experience_items[:2]:
+        bullets = exp.get("bullets", [])
+        if bullets:
+            body_sections.append({
+                "content": f"Key achievement: {bullets[0][:150]}...",
+                "prompt_used": prompt2,
+            })
+            break
     
     return body_sections
 
 
-def generate_cover_letter_closing(
+async def generate_cover_letter_closing(
     job: dict,
     company: str,
 ) -> tuple[str, str]:
-    prompt = f"Write a closing paragraph expressing enthusiasm for {job.title} at {company} and requesting an interview."
+    system_prompt = """You are a professional career coach writing cover letters.
+Write a confident, action-oriented closing. Express enthusiasm for the specific role.
+Include a subtle call-to-action about discussing qualifications.
+Keep it to 2-3 sentences maximum."""
     
-    closing = f"I am enthusiastic about the opportunity to contribute to {company} as {job.title} and would welcome the chance to discuss how my background aligns with your team's needs. Thank you for considering my application."
+    prompt = f"""Write a closing paragraph for a cover letter for a {job.get('title', 'role')} position at {company}.
+Express enthusiasm and request an interview.
+Write only the paragraph, no complimentary close or signature."""
     
+    content = await generate_ai_content(prompt, system_prompt)
+    
+    if content:
+        return content.strip(), prompt
+    
+    closing = f"I am enthusiastic about the opportunity to contribute to {company} as {job.get('title', 'the role')} and would welcome the chance to discuss how my background aligns with your team's needs. Thank you for considering my application."
     return closing, prompt
 
 
-def generate_cover_letter(
+async def generate_cover_letter(
     resume: dict,
     job: dict,
     profile: dict,
@@ -227,20 +342,20 @@ def generate_cover_letter(
     
     matched_skills, _ = find_matching_skills(
         resume.get("skills", []),
-        job.description,
-        job.skills_required or [],
+        job.get("description", ""),
+        job.get("skills_required", []) or [],
     )
     
-    intro_content, intro_prompt = generate_cover_letter_intro(job, profile)
+    intro_content, intro_prompt = await generate_cover_letter_intro(job, profile)
     intro = CoverLetterSection(content=intro_content, prompt_used=intro_prompt)
     
-    body_sections_data = generate_cover_letter_body(job, resume, matched_skills)
+    body_sections_data = await generate_cover_letter_body(job, resume, matched_skills)
     body = [
         CoverLetterSection(content=s["content"], prompt_used=s["prompt_used"])
         for s in body_sections_data
     ]
     
-    closing_content, closing_prompt = generate_cover_letter_closing(job, job.company)
+    closing_content, closing_prompt = await generate_cover_letter_closing(job, job.get("company", "the company"))
     closing = CoverLetterSection(content=closing_content, prompt_used=closing_prompt)
     
     full_parts = [intro.content]
@@ -250,7 +365,7 @@ def generate_cover_letter(
     full_text = "\n\n".join(full_parts)
     
     missing = []
-    job_keywords = extract_keywords(job.description)
+    job_keywords = extract_keywords(job.get("description", ""))
     if len(matched_skills) < len(job_keywords) * 0.3:
         missing.append("Limited direct experience with some listed requirements")
     
@@ -342,6 +457,7 @@ class TailoringService:
         user_id: uuid.UUID,
         job_id: uuid.UUID,
         resume_id: uuid.UUID | None = None,
+        use_ai: bool = True,
     ) -> dict | None:
         job_data = await self.get_job(job_id)
         if not job_data:
@@ -369,12 +485,15 @@ class TailoringService:
             job_data["skills_required"],
         )
         
-        summary = generate_summary_suggestion(
-            resume_data.get("summary"),
-            job_data["title"],
-            job_data["company"],
-            matched_skills,
-        )
+        if use_ai:
+            summary = await generate_ai_summary(resume_data, job_data, profile_data)
+        else:
+            summary = generate_summary_suggestion(
+                resume_data.get("summary"),
+                job_data["title"],
+                job_data["company"],
+                matched_skills,
+            )
         
         return {
             "job_id": job_id,
@@ -383,6 +502,7 @@ class TailoringService:
             "summary_suggestion": summary,
             "missing_qualifications": missing,
             "confidence": confidence,
+            "ai_used": use_ai,
         }
     
     async def generate_cover_letter_for_job(
@@ -405,10 +525,8 @@ class TailoringService:
         
         _, profile_data, _ = await self.get_user_data(user_id)
         
-        job_obj = type('Job', (), job_data)()
-        
-        result, missing, confidence = generate_cover_letter(
-            resume_data, job_obj, profile_data
+        result, missing, confidence = await generate_cover_letter(
+            resume_data, job_data, profile_data
         )
         result["job_id"] = job_id
         

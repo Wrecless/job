@@ -6,6 +6,7 @@ from typing import Literal
 class TailorRequest(BaseModel):
     job_id: UUID
     resume_id: UUID | None = None
+    use_ai: bool = True
 
 
 class TailoredBullet(BaseModel):
@@ -18,11 +19,12 @@ class TailoredBullet(BaseModel):
 
 class ResumeTailoringResponse(BaseModel):
     job_id: UUID
-    resume_id: UUID
+    resume_id: UUID | None
     tailored_bullets: list[TailoredBullet]
     summary_suggestion: str | None
     missing_qualifications: list[str]
     confidence: float
+    ai_used: bool = False
 
 
 class CoverLetterSection(BaseModel):

@@ -175,14 +175,16 @@ class TestGenerateSummarySuggestion:
 
 
 class TestCoverLetterGeneration:
-    def test_intro_generation(self):
-        job = type('Job', (), {"title": "Engineer", "company": "Tech Corp"})()
+    @pytest.mark.asyncio
+    async def test_intro_generation(self):
+        job = {"title": "Engineer", "company": "Tech Corp"}
         profile = {"headline": "Senior Developer"}
-        intro, prompt = generate_cover_letter_intro(job, profile)
+        intro, prompt = await generate_cover_letter_intro(job, profile)
         assert "Engineer" in intro
         assert "Tech Corp" in intro
 
-    def test_body_generation(self):
+    @pytest.mark.asyncio
+    async def test_body_generation(self):
         resume = {
             "experience": [
                 {
@@ -193,18 +195,20 @@ class TestCoverLetterGeneration:
             ],
             "skills": ["Python"],
         }
-        job = type('Job', (), {"title": "Engineer", "company": "Co"})()
-        body = generate_cover_letter_body(job, resume, ["python"])
+        job = {"title": "Engineer", "company": "Co"}
+        body = await generate_cover_letter_body(job, resume, ["python"])
         assert len(body) > 0
         assert "Old Co" in body[0]["content"]
 
-    def test_closing_generation(self):
-        job = type('Job', (), {"title": "Engineer", "company": "Tech Corp"})()
-        closing, prompt = generate_cover_letter_closing(job, "Tech Corp")
+    @pytest.mark.asyncio
+    async def test_closing_generation(self):
+        job = {"title": "Engineer", "company": "Tech Corp"}
+        closing, prompt = await generate_cover_letter_closing(job, "Tech Corp")
         assert "Tech Corp" in closing
         assert "Engineer" in closing
 
-    def test_full_letter_generation(self):
+    @pytest.mark.asyncio
+    async def test_full_letter_generation(self):
         resume = {
             "experience": [
                 {
@@ -216,15 +220,15 @@ class TestCoverLetterGeneration:
             "skills": ["Python"],
             "summary": None,
         }
-        job = type('Job', (), {
+        job = {
             "title": "Engineer",
             "company": "Tech Corp",
             "description": "Need Python experts",
             "skills_required": ["Python"],
-        })()
+        }
         profile = {}
         
-        result, missing, confidence = generate_cover_letter(resume, job, profile)
+        result, missing, confidence = await generate_cover_letter(resume, job, profile)
         
         assert "intro" in result
         assert "closing" in result

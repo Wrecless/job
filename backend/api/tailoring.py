@@ -56,6 +56,7 @@ async def tailor_resume(
         user_id=current_user.id,
         job_id=request.job_id,
         resume_id=request.resume_id,
+        use_ai=request.use_ai,
     )
     
     if not result:

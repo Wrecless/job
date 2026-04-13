@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     
     cors_origins: list[str] = ["http://localhost:3000"]
+    
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    ai_temperature: float = 0.7
+    ai_max_tokens: int = 500
 
     class Config:
         env_file = ".env"
