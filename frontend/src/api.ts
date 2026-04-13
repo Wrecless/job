@@ -44,6 +44,8 @@ export const sourcesAPI = {
   list: () => api.get('/sources/'),
   create: (data: any) => api.post('/sources/', data),
   delete: (name: string) => api.delete(`/sources/${name}`),
+  fetch: () => api.post('/automation/fetch-jobs'),
+  status: () => api.get('/automation/scheduler-status'),
 };
 
 export const jobsAPI = {

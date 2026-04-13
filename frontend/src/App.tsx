@@ -8,6 +8,7 @@ import Profile from './pages/Profile';
 import Resumes from './pages/Resumes';
 import Jobs from './pages/Jobs';
 import Applications from './pages/Applications';
+import Sources from './pages/Sources';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -37,6 +38,7 @@ function AppRoutes() {
       <Route path="/resumes" element={<ProtectedRoute><Resumes /></ProtectedRoute>} />
       <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
       <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
+      <Route path="/sources" element={<ProtectedRoute><Sources /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

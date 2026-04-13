@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     ai_temperature: float = 0.7
     ai_max_tokens: int = 500
+    
+    job_fetch_interval_hours: int = 6
+    max_jobs_per_fetch: int = 100
 
     class Config:
         env_file = ".env"

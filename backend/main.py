@@ -10,13 +10,19 @@ from backend.api.sources import router as sources_router
 from backend.api.jobs import router as jobs_router
 from backend.api.tailoring import router as tailoring_router
 from backend.api.applications import router as applications_router
+from backend.api.automation import router as automation_router
+from backend.services.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    start_scheduler()
+    
     yield
+    stop_scheduler()
     await engine.dispose()
 
 
@@ -44,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router)
     app.include_router(tailoring_router)
     app.include_router(applications_router)
+    app.include_router(automation_router)
     
     @app.get("/health")
     async def health():

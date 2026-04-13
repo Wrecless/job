@@ -6,7 +6,8 @@ const navItems = [
   { to: '/profile', label: 'Profile', icon: '👤' },
   { to: '/resumes', label: 'Resumes', icon: '📄' },
   { to: '/jobs', label: 'Jobs', icon: '💼' },
-  { to: '/applications', label: 'Applications', icon: '📋' },
+  { to: '/sources', label: 'Sources', icon: '🔗' },
+  { to: '/applications', label: 'Apps', icon: '📋' },
 ];
 
 export default function Navbar() {
