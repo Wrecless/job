@@ -66,5 +66,5 @@ docker compose run --rm backend pytest tests/ -v
 ## Tech Stack
 
 - **Backend**: FastAPI, SQLAlchemy, PostgreSQL/SQLite
-- **Frontend**: React, Vite, Tailwind CSS, TypeScript
+- **Frontend**: Next.js, React, Tailwind CSS, TypeScript
 - **AI**: OpenAI GPT-4o-mini (optional)

@@ -4,17 +4,27 @@
 
 html {
   color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #05060a;
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 32%),
+    radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.12), transparent 28%),
+    linear-gradient(180deg, #020409 0%, #070b16 55%, #05060a 100%);
+  background-attachment: fixed;
   color: #e5eef8;
   font-family: 'Atkinson Hyperlegible', 'OpenDyslexic', Inter, ui-sans-serif, system-ui, sans-serif;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.35);
+  color: #f8fcff;
 }

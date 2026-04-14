@@ -1,3 +1,5 @@
+"use client";
+
 import { isAxiosError } from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { alertsAPI, applicationsAPI, botAPI, jobsAPI, sourcesAPI } from '../api';
@@ -71,7 +73,7 @@ function LinkPill({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 hover:text-white"
+      className="inline-flex items-center rounded-full border border-cyan-300/20 bg-white/8 px-4 py-2 text-sm font-medium text-cyan-50 shadow-sm shadow-black/20 transition hover:border-cyan-200/30 hover:bg-cyan-400/18 hover:text-white"
     >
       {label}
     </a>
@@ -95,13 +97,38 @@ function normalizeExternalLink(href: string | undefined): string | null {
 function LinkChip({ href, label, mutedLabel }: { href: string | null; label: string; mutedLabel: string }) {
   if (!href) {
     return (
-      <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-slate-500">
+      <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-500">
         {mutedLabel}
       </span>
     );
   }
 
   return <LinkPill href={href} label={label} />;
+}
+
+function scoreTone(score?: number | null): string {
+  if (score == null) return 'slate';
+  if (score >= 80) return 'emerald';
+  if (score >= 60) return 'cyan';
+  if (score >= 40) return 'amber';
+  return 'rose';
+}
+
+function scoreAccent(score?: number | null): string {
+  const tone = scoreTone(score);
+
+  switch (tone) {
+    case 'emerald':
+      return 'from-emerald-400 via-cyan-300 to-sky-400';
+    case 'cyan':
+      return 'from-cyan-400 via-sky-400 to-indigo-400';
+    case 'amber':
+      return 'from-amber-300 via-orange-300 to-rose-300';
+    case 'rose':
+      return 'from-rose-400 via-fuchsia-400 to-violet-400';
+    default:
+      return 'from-slate-500 via-slate-400 to-slate-300';
+  }
 }
 
 export default function Jobs() {
@@ -294,50 +321,70 @@ export default function Jobs() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#05060a] px-6 py-12 text-slate-100">
-        <div className="mx-auto max-w-6xl">Loading...</div>
+      <div className="relative min-h-screen overflow-hidden px-6 py-12 text-slate-100">
+        <div className="pointer-events-none absolute inset-0 opacity-80">
+          <div className="absolute left-[-10rem] top-16 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="absolute right-[-8rem] top-28 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-7xl rounded-[2.25rem] border border-white/10 bg-white/[0.06] px-6 py-10 text-lg shadow-[0_24px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+          Loading jobs...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.12),_transparent_34%),linear-gradient(180deg,#05060a_0%,#090b12_100%)] px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/30 backdrop-blur">
+    <div className="relative min-h-screen overflow-hidden px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 opacity-75">
+        <div className="absolute left-[-8rem] top-10 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute right-[-8rem] top-24 h-[30rem] w-[30rem] rounded-full bg-fuchsia-500/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:36px_36px] opacity-[0.08]" />
+      </div>
+      <div className="relative mx-auto max-w-7xl">
+        <header className="relative mb-6 overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/[0.06] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-2xl sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_24%)]" />
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300/80">Job view</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Jobs</h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                Clear, high-contrast cards with bigger spacing and simpler labels.
+            <div className="relative max-w-3xl">
+              <p className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-cyan-100">
+                Remote entry-level queue
+              </p>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl">
+                Jobs that feel easier to say yes to.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
+                A calmer, more modern workspace for remote roles, with entry-level filtering, scored alerts, and quick source management.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-sm sm:min-w-[22rem]">
-              <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                <div className="text-slate-400">Applied</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{appliedCount}</div>
+            <div className="relative grid grid-cols-2 gap-3 text-sm sm:min-w-[28rem] sm:grid-cols-4">
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-3 shadow-inner shadow-black/20">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Applied</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums text-white">{appliedCount}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                <div className="text-slate-400">Open</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{notAppliedCount}</div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-3 shadow-inner shadow-black/20">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Open</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums text-white">{notAppliedCount}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                <div className="text-slate-400">Matches</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{unreadAlerts + readyAlerts}</div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-3 shadow-inner shadow-black/20">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Unread</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums text-white">{unreadAlerts}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-3 shadow-inner shadow-black/20">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Ready</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums text-white">{readyAlerts}</div>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="relative mt-7 flex flex-wrap items-center gap-2">
             {(['all', 'applied', 'not_applied'] as const).map((value) => (
               <button
                 key={value}
                 onClick={() => setFilter(value)}
                 className={`rounded-full px-4 py-2 text-sm font-medium tracking-wide transition ${
                   filter === value
-                    ? 'bg-cyan-300 text-black'
-                    : 'border border-white/15 bg-black/25 text-slate-200 hover:bg-white/10'
+                    ? 'bg-cyan-300 text-black shadow-lg shadow-cyan-400/20'
+                    : 'border border-white/15 bg-black/20 text-slate-200 hover:bg-white/12 hover:text-white'
                 }`}
               >
                 {value.replace('_', ' ')}
@@ -347,25 +394,25 @@ export default function Jobs() {
             <button
               onClick={handleRunBot}
               disabled={busyBot}
-              className="ml-auto rounded-full border border-cyan-300/30 bg-cyan-300 px-4 py-2 text-sm font-semibold text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="ml-auto rounded-full bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-black shadow-lg shadow-cyan-400/20 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busyBot ? 'Finding jobs...' : 'Find and score jobs'}
             </button>
           </div>
 
-          {message && <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-cyan-50">{message}</div>}
+          {message && <div className="relative mt-4 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-cyan-50 shadow-[0_10px_30px_rgba(34,211,238,0.12)]">{message}</div>}
 
           {hasPlaceholderLinks && (
-            <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-amber-100">
+            <div className="relative mt-4 rounded-3xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-amber-100">
               Some configured sources still point at demo URLs. Real links will appear once real job sources are added.
             </div>
           )}
         </header>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_390px]">
           <section className="space-y-4">
             {visibleJobs.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-slate-300">
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-8 text-slate-300 shadow-[0_18px_60px_rgba(0,0,0,0.25)]">
                 No jobs to show for this filter.
               </div>
             ) : (
@@ -376,28 +423,29 @@ export default function Jobs() {
                 return (
                   <article
                     key={job.job_id}
-                    className="rounded-3xl border border-white/10 bg-[#0b1020]/95 p-6 shadow-xl shadow-black/30"
+                    className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-white/[0.08]"
                   >
+                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${scoreAccent(job.score_total)}`} />
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${applied ? 'bg-emerald-400/15 text-emerald-200' : 'bg-slate-500/15 text-slate-300'}`}>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${applied ? 'bg-emerald-400/15 text-emerald-200' : 'bg-slate-500/15 text-slate-300'}`}>
                             {applied ? 'Applied' : 'Not applied'}
                           </span>
                           {job.score_total != null && (
-                            <span className="rounded-full bg-cyan-400/15 px-3 py-1 text-xs font-semibold text-cyan-100">
+                            <span className="rounded-full bg-cyan-400/15 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-100">
                               Score {Number(job.score_total).toFixed(1)}
                             </span>
                           )}
                         </div>
 
-                        <h2 className="mt-4 text-2xl font-semibold leading-tight text-white">{job.title}</h2>
-                        <p className="mt-1 text-lg text-slate-300">{job.company}</p>
+                        <h2 className="mt-4 text-2xl font-semibold leading-tight text-white sm:text-[2rem]">{job.title}</h2>
+                        <p className="mt-1 text-lg text-slate-200">{job.company}</p>
 
                         <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-300">
-                          {job.location && <span className="rounded-full bg-white/5 px-3 py-1">{job.location}</span>}
-                          {job.remote_type && <span className="rounded-full bg-white/5 px-3 py-1">{job.remote_type}</span>}
-                          <span className="rounded-full bg-white/5 px-3 py-1">Found on {job.source_name}</span>
+                          {job.location && <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{job.location}</span>}
+                          {job.remote_type && <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">{job.remote_type}</span>}
+                          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">Found on {job.source_name}</span>
                         </div>
 
                         <div className="mt-5 flex flex-wrap gap-3">
@@ -423,7 +471,7 @@ export default function Jobs() {
                       <button
                         onClick={() => handleToggleApplied(job)}
                         disabled={busyJobId === job.job_id}
-                        className="inline-flex items-center justify-center rounded-full bg-cyan-300 px-5 py-3 text-sm font-semibold text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center justify-center rounded-full bg-cyan-300 px-5 py-3 text-sm font-semibold text-black shadow-lg shadow-cyan-400/15 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {busyJobId === job.job_id ? 'Saving...' : applied ? 'Mark not applied' : 'Mark applied'}
                       </button>
@@ -439,19 +487,19 @@ export default function Jobs() {
           </section>
 
           <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <section className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-[0_16px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-white">Match queue</h2>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setAlertTab('unread')}
-                    className={`rounded-full px-3 py-1 text-sm font-medium ${alertTab === 'unread' ? 'bg-cyan-300 text-black' : 'bg-white/10 text-slate-200'}`}
+                    className={`rounded-full px-3 py-1 text-sm font-medium transition ${alertTab === 'unread' ? 'bg-cyan-300 text-black shadow-lg shadow-cyan-400/20' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                   >
                     Unread ({unreadAlerts})
                   </button>
                   <button
                     onClick={() => setAlertTab('ready')}
-                    className={`rounded-full px-3 py-1 text-sm font-medium ${alertTab === 'ready' ? 'bg-amber-300 text-black' : 'bg-white/10 text-slate-200'}`}
+                    className={`rounded-full px-3 py-1 text-sm font-medium transition ${alertTab === 'ready' ? 'bg-amber-300 text-black shadow-lg shadow-amber-400/20' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
                   >
                     Ready ({readyAlerts})
                   </button>
@@ -463,7 +511,7 @@ export default function Jobs() {
               ) : (
                 <div className="mt-4 space-y-4">
                   {(alertTab === 'unread' ? unreadAlertsList : readyAlertsList).map((alert) => (
-                    <article key={alert.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                    <article key={alert.id} className="rounded-3xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-black/20 transition hover:bg-black/25">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-white">{alert.job_title}</p>
@@ -481,7 +529,7 @@ export default function Jobs() {
                         {alert.draft_data?.application_draft && (
                           <button
                             onClick={() => handleCopyDraft(alert)}
-                            className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-slate-200"
+                            className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-black shadow-sm shadow-black/10 transition hover:bg-slate-200"
                           >
                             Copy & ready
                           </button>
@@ -512,24 +560,24 @@ export default function Jobs() {
               )}
             </section>
 
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <section className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-[0_16px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl">
               <h2 className="text-lg font-semibold text-white">Sources</h2>
               <p className="mt-1 text-sm leading-6 text-slate-400">
-                Add real job boards here. Manual sources are stored, but only Greenhouse, Lever, and Ashby are fetched by the bot.
+                Keep only real ATS sources here. The bot fetches Greenhouse, Lever, and Ashby boards.
               </p>
 
               <div className="mt-4 space-y-3">
-                <input
-                  value={sourceName}
-                  onChange={(event) => setSourceName(event.target.value)}
-                  placeholder="Source name"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-slate-500"
-                />
+                  <input
+                    value={sourceName}
+                    onChange={(event) => setSourceName(event.target.value)}
+                    placeholder="Source name"
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-300/40 focus:outline-none focus:ring-2 focus:ring-cyan-300/20"
+                  />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <select
                     value={sourceType}
                     onChange={(event) => setSourceType(event.target.value)}
-                    className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white"
+                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none focus:ring-2 focus:ring-cyan-300/20"
                   >
                     <option value="greenhouse">greenhouse</option>
                     <option value="lever">lever</option>
@@ -540,7 +588,7 @@ export default function Jobs() {
                     value={sourceBaseUrl}
                     onChange={(event) => setSourceBaseUrl(event.target.value)}
                     placeholder="Base URL"
-                    className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-300/40 focus:outline-none focus:ring-2 focus:ring-cyan-300/20"
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -548,14 +596,14 @@ export default function Jobs() {
                     type="checkbox"
                     checked={sourceIsActive}
                     onChange={(event) => setSourceIsActive(event.target.checked)}
-                    className="h-4 w-4 rounded border-white/20 bg-black/30"
+                    className="h-4 w-4 rounded border-white/20 bg-black/30 accent-cyan-300"
                   />
                   Active
                 </label>
                 <button
                   onClick={handleCreateSource}
                   disabled={busySourceId === 'create' || !sourceName || !sourceType || !sourceBaseUrl}
-                  className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-black transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-cyan-400/15 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busySourceId === 'create' ? 'Saving...' : 'Add source'}
                 </button>
@@ -566,7 +614,7 @@ export default function Jobs() {
                   <p className="text-sm text-slate-400">No sources yet.</p>
                 ) : (
                   sources.map((source) => (
-                    <article key={source.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                    <article key={source.id} className="rounded-3xl border border-white/10 bg-black/18 p-4 shadow-inner shadow-black/20 transition hover:bg-black/25">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-white">{source.name}</p>
