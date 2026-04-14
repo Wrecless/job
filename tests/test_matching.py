@@ -12,6 +12,7 @@ from backend.services.matching import (
     score_job,
     MatchingService,
 )
+from backend.services.portfolio import load_portfolio_profile
 
 
 @pytest.fixture
@@ -121,7 +122,7 @@ class TestSalaryFit:
 
     def test_above_max(self):
         result = calculate_salary_fit(200000, 50000, 100000)
-        assert result == 20.0
+        assert result == 0.0
 
     def test_between_range(self):
         result = calculate_salary_fit(125000, 100000, 150000)
@@ -129,7 +130,7 @@ class TestSalaryFit:
 
     def test_no_job_salary(self):
         result = calculate_salary_fit(100000, None, None)
-        assert result == 50.0
+        assert result == 0.0
 
     def test_no_profile_floor(self):
         result = calculate_salary_fit(None, 100000, 150000)
@@ -203,8 +204,69 @@ class TestScoreJob:
         
         assert score < 50.0
 
+    def test_portfolio_mode_prefers_remote(self):
+        profile = {
+            "source": "portfolio",
+            "target_roles": [],
+            "seniority": None,
+            "salary_floor": 35000,
+            "locations": ["Remote", "UK"],
+            "remote_preference": "remote",
+        }
+        remote_job = {
+            "title": "Backend Engineer",
+            "skills_required": [],
+            "seniority": None,
+            "location": "Remote",
+            "salary_min": 50000,
+            "salary_max": 70000,
+            "remote_type": "remote",
+        }
+        onsite_job = {
+            "title": "Backend Engineer",
+            "skills_required": [],
+            "seniority": None,
+            "location": "London",
+            "salary_min": 50000,
+            "salary_max": 70000,
+            "remote_type": "onsite",
+        }
+
+        remote_score, _, _ = score_job(profile, remote_job, [])
+        onsite_score, _, _ = score_job(profile, onsite_job, [])
+
+        assert remote_score > onsite_score
+
 
 class TestMatchingService:
+    @pytest.mark.asyncio
+    async def test_get_user_profile_falls_back_to_portfolio(self, async_session, monkeypatch):
+        from backend.services import matching as matching_module
+
+        monkeypatch.setattr(
+            matching_module,
+            "load_portfolio_profile",
+            lambda path: {
+                "source": "portfolio",
+                "remote_preference": "remote",
+                "salary_floor": 35000,
+                "locations": ["Remote", "UK"],
+                "target_roles": [],
+            },
+        )
+        monkeypatch.setattr(
+            matching_module,
+            "get_settings",
+            lambda: type("S", (), {"portfolio_path": "portfolio.md"})(),
+        )
+
+        service = MatchingService(async_session)
+        profile = await service.get_user_profile(uuid.uuid4())
+
+        assert profile is not None
+        assert profile["source"] == "portfolio"
+        assert profile["remote_preference"] == "remote"
+
     @pytest.mark.asyncio
     async def test_score_job_creates_match_score(self, async_session):
         from backend.db.models import User, Profile, Job, MatchScore, JobSource
@@ -334,3 +396,39 @@ class TestMatchingService:
         assert len(jobs) == 2
         assert jobs[0]["score_total"] == 85.0
         assert jobs[1]["score_total"] == 45.0
+
+
+class TestPortfolioLoader:
+    def test_load_portfolio_profile(self, tmp_path):
+        portfolio = tmp_path / "portfolio.md"
+        portfolio.write_text(
+            """# Portfolio
+
+## Job Target
+- Fully remote only
+- Prefer companies in the UK
+
+## Source Filters
+- Include source types: greenhouse, lever, ashby
+
+## Notification Preferences
+- Mobile app notifications would be ideal
+""",
+            encoding="utf-8",
+        )
+
+        profile = load_portfolio_profile(str(portfolio))
+
+        assert profile["source"] == "portfolio"
+        assert profile["remote_preference"] == "remote"
+        assert profile["salary_policy"] == "uk_or_above"
+        assert profile["source_types_include"] == ["greenhouse", "lever", "ashby"]
+        assert "Fully remote only" in profile["job_target"]
+
+    def test_salary_floor_is_uk_minimum_wage_or_above(self, tmp_path):
+        portfolio = tmp_path / "portfolio.md"
+        portfolio.write_text("# Portfolio\n\n## Job Target\n- Fully remote only\n", encoding="utf-8")
+
+        profile = load_portfolio_profile(str(portfolio))
+
+        assert profile["salary_floor"] == 23837

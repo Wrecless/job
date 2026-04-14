@@ -34,6 +34,18 @@ async def fetch_all_jobs():
         logger.error(f"Job fetch error: {e}")
 
 
+async def scan_job_alerts():
+    from backend.db.base import async_session
+    from backend.services.scan import scan_and_queue_matches
+
+    try:
+        async with async_session() as session:
+            created = await scan_and_queue_matches(session)
+            logger.info(f"Queued {created} job alerts")
+    except Exception as e:
+        logger.error(f"Job scan error: {e}")
+
+
 def start_scheduler():
     global scheduler
     if scheduler is not None:
@@ -47,6 +59,12 @@ def start_scheduler():
         fetch_all_jobs,
         IntervalTrigger(hours=settings.job_fetch_interval_hours),
         id="job_fetch",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        scan_job_alerts,
+        IntervalTrigger(hours=settings.job_scan_interval_hours),
+        id="job_scan",
         replace_existing=True,
     )
     

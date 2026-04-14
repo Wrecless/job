@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.db.models import User, Profile, Resume, Job, MatchScore
+from backend.config import get_settings
+from backend.services.portfolio import load_portfolio_profile
 from backend.schemas.matching import ScoreBreakdown
 
 
@@ -118,10 +120,10 @@ def calculate_salary_fit(
         return 50.0
     
     if not job_salary_min and not job_salary_max:
-        return 50.0
+        return 0.0
     
     if job_salary_max and profile_floor > job_salary_max:
-        return 20.0
+        return 0.0
     
     if job_salary_min and profile_floor <= job_salary_min:
         return 100.0
@@ -130,10 +132,9 @@ def calculate_salary_fit(
         midpoint = (job_salary_min + job_salary_max) / 2
         if profile_floor <= midpoint:
             return 100.0
-        ratio = job_salary_max / profile_floor
-        return min(ratio * 50, 100.0)
+        return 75.0
     
-    return 50.0
+    return 0.0
 
 
 def calculate_remote_fit(
@@ -175,15 +176,21 @@ def score_job(
     job: dict,
     user_skills: list[str],
 ) -> tuple[float, ScoreBreakdown, str]:
+    portfolio_mode = profile.get("source") == "portfolio"
+
     title_similarity = calculate_title_similarity(
         profile.get("target_roles", []),
         job.get("title", ""),
     )
+    if portfolio_mode and not profile.get("target_roles"):
+        title_similarity = 75.0
     
     skill_match = calculate_skill_match(
         user_skills,
         job.get("skills_required", []),
     )
+    if portfolio_mode and not user_skills:
+        skill_match = 75.0
     
     seniority_fit = calculate_seniority_fit(
         profile.get("seniority"),
@@ -194,6 +201,8 @@ def score_job(
         profile.get("locations", []),
         job.get("location"),
     )
+    if portfolio_mode and job.get("remote_type") == "remote" and location_fit < 75.0:
+        location_fit = 75.0
     
     salary_fit = calculate_salary_fit(
         profile.get("salary_floor"),
@@ -259,25 +268,10 @@ class MatchingService:
     async def get_user_profile(self, user_id: uuid.UUID) -> dict | None:
         from sqlalchemy import select
         from backend.db.models import Profile
-        
-        result = await self.session.execute(
-            select(Profile).where(Profile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
-        
-        if profile:
-            return {
-                "headline": profile.headline,
-                "target_roles": profile.target_roles or [],
-                "seniority": profile.seniority,
-                "salary_floor": profile.salary_floor,
-                "locations": profile.locations or [],
-                "remote_preference": profile.remote_preference,
-                "industries_to_avoid": profile.industries_to_avoid or [],
-                "keywords_include": profile.keywords_include or [],
-                "keywords_exclude": profile.keywords_exclude or [],
-            }
-        return None
+
+        settings = get_settings()
+        portfolio_profile = load_portfolio_profile(settings.portfolio_path)
+        return portfolio_profile
     
     async def get_user_skills(self, user_id: uuid.UUID) -> list[str]:
         from sqlalchemy import select
@@ -432,12 +426,21 @@ class MatchingService:
     ) -> tuple[list[dict], int]:
         from sqlalchemy import select, func
         from backend.db.models import Job, MatchScore
+
+        profile = await self.get_user_profile(user_id)
+        salary_floor = profile.get("salary_floor") if profile else None
         
         query = (
             select(Job, MatchScore)
-            .join(MatchScore, Job.id == MatchScore.job_id, isouter=True)
-            .where(MatchScore.user_id == user_id)
+            .join(
+                MatchScore,
+                (Job.id == MatchScore.job_id) & (MatchScore.user_id == user_id),
+                isouter=True,
+            )
         )
+
+        if salary_floor is not None:
+            query = query.where((Job.salary_max.is_(None)) | (Job.salary_max >= salary_floor))
         
         if min_score is not None:
             query = query.where(MatchScore.score_total >= min_score)

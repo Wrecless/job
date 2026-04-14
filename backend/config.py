@@ -5,6 +5,9 @@ from functools import lru_cache
 class Settings(BaseSettings):
     app_name: str = "JobCodex"
     debug: bool = False
+    personal_user_email: str = "personal@jobcodex.local"
+    portfolio_path: str = "portfolio.md"
+    job_scan_interval_hours: int = 24
     
     database_url: str = "sqlite+aiosqlite:///./jobcodex.db"
     

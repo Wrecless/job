@@ -55,6 +55,7 @@ class Job(Base):
     source: Mapped["JobSource"] = relationship("JobSource", back_populates="jobs")
     match_scores: Mapped[list["MatchScore"]] = relationship("MatchScore", back_populates="job")
     applications: Mapped[list["Application"]] = relationship("Application", back_populates="job")
+    alerts: Mapped[list["JobAlert"]] = relationship("JobAlert", back_populates="job")
 
 
 from backend.db.models.job_source import JobSource

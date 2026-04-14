@@ -1,13 +1,21 @@
-import { useState, useEffect } from 'react';
-import { jobsAPI, applicationsAPI, tailoringAPI } from '../api';
+import { useEffect, useMemo, useState } from 'react';
+import { alertsAPI, applicationsAPI, jobsAPI } from '../api';
+
+type ViewFilter = 'all' | 'applied' | 'not_applied';
+type AlertTab = 'unread' | 'ready';
 
 export default function Jobs() {
   const [jobs, setJobs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [readyAlerts, setReadyAlerts] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [applyingTo, setApplyingTo] = useState<string | null>(null);
-  const [tailoring, setTailoring] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [filter, setFilter] = useState<ViewFilter>('all');
+  const [alertTab, setAlertTab] = useState<AlertTab>('unread');
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const [busyAlertId, setBusyAlertId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     loadJobs();
@@ -15,8 +23,17 @@ export default function Jobs() {
 
   const loadJobs = async () => {
     try {
-      const res = await jobsAPI.list();
-      setJobs(res.data?.jobs || []);
+      const [jobsRes, appsRes, alertsRes] = await Promise.all([
+        jobsAPI.list(),
+        applicationsAPI.list(),
+        alertsAPI.list(),
+      ]);
+
+      setJobs(jobsRes.data?.jobs || []);
+      setApplications(appsRes.data?.applications || []);
+      setAlerts(alertsRes.data?.alerts || []);
+      setUnreadAlerts(alertsRes.data?.unread_total || 0);
+      setReadyAlerts(alertsRes.data?.ready_total || 0);
     } catch (err) {
       console.error('Failed to load jobs', err);
     } finally {
@@ -24,127 +41,225 @@ export default function Jobs() {
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return loadJobs();
-    setLoading(true);
+  const applicationsByJobId = useMemo(
+    () => new Map(applications.map((application) => [application.job_id, application])),
+    [applications],
+  );
+
+  const visibleJobs = jobs.filter((job) => {
+    const isApplied = applicationsByJobId.has(job.job_id);
+    if (filter === 'applied') return isApplied;
+    if (filter === 'not_applied') return !isApplied;
+    return true;
+  });
+
+  const appliedCount = applications.length;
+  const notAppliedCount = jobs.length - applicationsByJobId.size;
+
+  const unreadAlertsList = alerts.filter((alert) => alert.status !== 'ready');
+  const readyAlertsList = alerts.filter((alert) => alert.status === 'ready');
+
+  const handleToggleApplied = async (job: any) => {
+    const existing = applicationsByJobId.get(job.job_id);
+    setBusyJobId(job.job_id);
+    setMessage('');
+
     try {
-      const res = await jobsAPI.search({ q: searchTerm });
-      setJobs(res.data?.jobs || []);
-    } catch (err) {
-      console.error('Search failed', err);
+      if (existing) {
+        await applicationsAPI.delete(existing.id);
+        setMessage(`Removed applied status for ${job.title}`);
+      } else {
+        await applicationsAPI.create(job.job_id);
+        setMessage(`Marked ${job.title} as applied`);
+      }
+
+      await loadJobs();
+    } catch (err: any) {
+      setMessage(err.response?.data?.detail || 'Failed to update application status');
     } finally {
-      setLoading(false);
+      setBusyJobId(null);
     }
   };
 
-  const handleApply = async (jobId: string) => {
-    setApplyingTo(jobId);
+  const handleMarkAlertRead = async (alertId: string) => {
+    setBusyAlertId(alertId);
+    setMessage('');
+
     try {
-      await applicationsAPI.create(jobId);
-      alert('Application created!');
+      await alertsAPI.markRead(alertId);
+      await loadJobs();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to create application');
+      setMessage(err.response?.data?.detail || 'Failed to update alert');
     } finally {
-      setApplyingTo(null);
+      setBusyAlertId(null);
     }
   };
 
-  const handleTailor = async (jobId: string) => {
-    setTailoring(jobId);
+  const handleCopyDraft = async (alert: any) => {
+    if (!alert.draft_data?.application_draft) return;
+
     try {
-      const res = await tailoringAPI.tailor(jobId, undefined, false);
-      setResult(res.data);
+      await navigator.clipboard.writeText(alert.draft_data.application_draft);
+      await alertsAPI.updateStatus(alert.id, 'ready');
+      setMessage(`Copied draft and marked ${alert.job_title} as ready`);
+      await loadJobs();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to generate tailored content');
-    } finally {
-      setTailoring(null);
+      setMessage(err.response?.data?.detail || 'Failed to copy draft');
     }
   };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Jobs</h1>
-
-      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search jobs..."
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-md"
-        />
-        <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-          Search
-        </button>
-      </form>
-
-      {result && (
-        <div className="mb-6 bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-lg font-semibold">Tailored Content</h3>
-            <button onClick={() => setResult(null)} className="text-gray-500 hover:text-gray-700">Close</button>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Jobs</h1>
+            <p className="mt-1 text-gray-600">
+              {appliedCount} applied, {notAppliedCount} not applied
+            </p>
+            <p className="mt-1 text-sm text-indigo-700">{unreadAlerts} new matches</p>
           </div>
-          
-          {result.cover_letter && (
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Cover Letter</h4>
-              <div className="bg-gray-50 p-4 rounded whitespace-pre-wrap text-sm">
-                {result.cover_letter.full_text}
-              </div>
+
+          <div className="flex gap-2">
+            {(['all', 'applied', 'not_applied'] as const).map((value) => (
+              <button
+                key={value}
+                onClick={() => setFilter(value)}
+                className={`rounded-md px-4 py-2 text-sm capitalize ${
+                  filter === value ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'
+                }`}
+              >
+                {value.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {message && <div className="mb-4 rounded bg-blue-50 px-4 py-3 text-blue-800">{message}</div>}
+
+        <div className="mb-6 rounded-lg border border-indigo-100 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Match queue</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAlertTab('unread')}
+                className={`rounded-md px-3 py-1 text-sm ${alertTab === 'unread' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Unread ({unreadAlerts})
+              </button>
+              <button
+                onClick={() => setAlertTab('ready')}
+                className={`rounded-md px-3 py-1 text-sm ${alertTab === 'ready' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Ready ({readyAlerts})
+              </button>
             </div>
-          )}
-          
-          {result.resume?.summary_suggestion && (
-            <div>
-              <h4 className="font-medium mb-2">Suggested Summary</h4>
-              <p className="bg-gray-50 p-4 rounded text-sm">{result.resume.summary_suggestion}</p>
+          </div>
+          {(alertTab === 'unread' ? unreadAlertsList : readyAlertsList).length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">No {alertTab} matches yet.</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {(alertTab === 'unread' ? unreadAlertsList : readyAlertsList).map((alert) => (
+                <div key={alert.id} className="rounded-md border border-gray-200 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{alert.job_title} at {alert.job_company}</p>
+                      <p className="text-sm text-gray-600">{alert.job_location || 'Remote'}</p>
+                      <p className="mt-1 text-sm text-gray-700">{alert.explanation}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-1 text-xs ${alert.status === 'ready' ? 'bg-amber-100 text-amber-700' : alert.status === 'read' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'}`}>
+                        {alert.status}
+                      </span>
+                      {alert.draft_data?.application_draft && (
+                        <button
+                          onClick={() => handleCopyDraft(alert)}
+                          className="rounded-md bg-gray-900 px-3 py-1 text-xs text-white"
+                        >
+                          Copy & ready
+                        </button>
+                      )}
+                      {alert.status !== 'read' && (
+                        <button
+                          onClick={() => handleMarkAlertRead(alert.id)}
+                          disabled={busyAlertId === alert.id}
+                          className="rounded-md bg-indigo-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                        >
+                          {busyAlertId === alert.id ? 'Saving...' : 'Mark read'}
+                        </button>
+                      )}
+                      
+                    </div>
+                  </div>
+                  {alert.draft_data?.next_steps && (
+                    <ul className="mt-2 list-disc pl-5 text-sm text-gray-600">
+                      {alert.draft_data.next_steps.map((step: string) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {alert.draft_data?.application_draft && (
+                    <pre className="mt-3 whitespace-pre-wrap rounded bg-gray-50 p-3 text-sm text-gray-700">
+                      {alert.draft_data.application_draft}
+                    </pre>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      )}
 
-      <div className="space-y-4">
-        {jobs.length === 0 ? (
-          <p className="text-gray-500">No jobs found. Add job sources to start discovering opportunities!</p>
-        ) : (
-          jobs.map((job) => (
-            <div key={job.id} className="bg-white rounded-lg shadow p-4">
-              <div className="flex justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg">{job.title}</h3>
-                  <p className="text-gray-600">{job.company}</p>
-                  <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                    {job.location && <span>{job.location}</span>}
-                    {job.remote_type && <span>{job.remote_type}</span>}
-                    {job.employment_type && <span>{job.employment_type}</span>}
+        <div className="space-y-4">
+          {visibleJobs.length === 0 ? (
+            <p className="text-gray-500">No jobs to show.</p>
+          ) : (
+            visibleJobs.map((job) => {
+              const application = applicationsByJobId.get(job.job_id);
+              const applied = Boolean(application);
+
+              return (
+                <div key={job.job_id} className="rounded-lg bg-white p-4 shadow">
+                  <div className="flex justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{job.title}</h3>
+                      <p className="text-gray-600">{job.company}</p>
+                      <div className="mt-2 flex gap-4 text-sm text-gray-500">
+                        {job.location && <span>{job.location}</span>}
+                        {job.remote_type && <span>{job.remote_type}</span>}
+                        {job.score_total != null && <span>Score {Number(job.score_total).toFixed(1)}</span>}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleApplied(job)}
+                      disabled={busyJobId === job.job_id}
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {busyJobId === job.job_id ? 'Saving...' : applied ? 'Mark not applied' : 'Mark applied'}
+                    </button>
+                  </div>
+
+                  {job.description && <p className="mt-3 text-sm text-gray-600 line-clamp-3">{job.description}</p>}
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs ${
+                        applied ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {applied ? 'Applied' : 'Not applied'}
+                    </span>
+                    {application?.status && (
+                      <span className="text-xs text-gray-500">Status: {application.status}</span>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleTailor(job.id)}
-                    disabled={tailoring === job.id}
-                    className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                  >
-                    {tailoring === job.id ? 'Generating...' : 'Tailor'}
-                  </button>
-                  <button
-                    onClick={() => handleApply(job.id)}
-                    disabled={applyingTo === job.id}
-                    className="px-4 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {applyingTo === job.id ? 'Applying...' : 'Apply'}
-                  </button>
-                </div>
-              </div>
-              {job.description && (
-                <p className="mt-3 text-sm text-gray-600 line-clamp-3">{job.description}</p>
-              )}
-            </div>
-          ))
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

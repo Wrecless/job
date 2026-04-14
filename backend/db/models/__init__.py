@@ -8,6 +8,7 @@ from backend.db.models.application import Application, APPLICATION_STATUSES
 from backend.db.models.artifact import ApplicationArtifact, ARTIFACT_TYPES
 from backend.db.models.task import Task, TASK_TYPES, TASK_STATUSES
 from backend.db.models.audit import AuditLog
+from backend.db.models.alert import JobAlert
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "TASK_TYPES",
     "TASK_STATUSES",
     "AuditLog",
+    "JobAlert",
 ]

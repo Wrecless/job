@@ -36,6 +36,7 @@ class User(Base):
     resumes: Mapped[list["Resume"]] = relationship("Resume", back_populates="user")
     match_scores: Mapped[list["MatchScore"]] = relationship("MatchScore", back_populates="user")
     applications: Mapped[list["Application"]] = relationship("Application", back_populates="user")
+    job_alerts: Mapped[list["JobAlert"]] = relationship("JobAlert", back_populates="user")
 
     def is_deleted(self) -> bool:
         return self.deleted_at is not None

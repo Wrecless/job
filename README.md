@@ -1,6 +1,6 @@
 # JobCodex
 
-Job copilot for discovery, matching, tailoring, and tracking.
+Personal jobs tracker for reviewing open jobs and marking whether they have been applied to.
 
 ## Quick Start
 
@@ -20,6 +20,16 @@ cd frontend && npm run dev
 
 Open http://localhost:5173 to see the app.
 
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:5173.
+
+The backend SQLite database is stored in the named Docker volume `jobcodex_data`.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and configure:
@@ -35,24 +45,22 @@ DATABASE_URL=sqlite+aiosqlite:///./jobcodex.db
 
 Without OpenAI API key, the app falls back to template-based content generation.
 
+The app runs in personal mode by default and creates a single local user automatically.
+
 ## Features
 
-- **Auth**: JWT-based registration/login
-- **Profile**: Target roles, locations, seniority preferences
-- **Resumes**: Upload PDF/DOCX, auto-parse
-- **Jobs**: Add Greenhouse/Lever/Ashby sources, search
-- **Matching**: Score jobs against your profile
-- **Tailoring**: AI-powered resume bullets & cover letters
-- **Tracking**: Pipeline view, status updates, tasks
+- **Personal mode**: No login required, single-user local access
+- **Jobs**: View jobs and mark them applied or not applied
+- **Tracking**: Simple application status list
 
 ## API
 
-The backend runs at http://localhost:8000 with Swagger docs at /docs.
+The backend runs at http://localhost:8000.
 
 ## Testing
 
 ```bash
-pytest tests/ -v
+docker compose run --rm backend pytest tests/ -v
 ```
 
 ## Tech Stack
