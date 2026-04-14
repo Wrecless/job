@@ -27,6 +27,8 @@ class MatchScoreResponse(BaseModel):
 class JobWithMatch(BaseModel):
     job_id: UUID
     source_job_id: str
+    source_name: str
+    source_url: str
     company: str
     title: str
     location: str | None

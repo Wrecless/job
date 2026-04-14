@@ -21,7 +21,7 @@ class BaseConnector(ABC):
     
     def normalize(self, raw: dict) -> dict:
         job_id = raw.get("id") or raw.get("id") or str(raw.get("absolute_id", ""))
-        company = raw.get("company") or raw.get("departments", [{}])[0].get("name", "Unknown")
+        company = self._extract_company(raw)
         title = raw.get("title", "Unknown")
         location = self._extract_location(raw)
         description = self._extract_description(raw)
@@ -51,10 +51,21 @@ class BaseConnector(ABC):
             "raw_payload": raw,
             "canonical_hash": canonical_hash,
         }
-    
+
+    def _extract_company(self, raw: dict) -> str:
+        company = raw.get("company_name") or raw.get("company")
+        if company:
+            return company
+        departments = raw.get("departments", [])
+        if departments and isinstance(departments[0], dict) and departments[0].get("name"):
+            return departments[0]["name"]
+        return "Unknown"
+
     def _extract_location(self, raw: dict) -> str | None:
         location = raw.get("location", "")
         if location:
+            if isinstance(location, dict):
+                return location.get("name") or location.get("location") or None
             return location
         offices = raw.get("offices", [])
         if offices:

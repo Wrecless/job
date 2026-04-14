@@ -6,7 +6,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.db.models import User, Profile, Resume, Job, MatchScore
+from backend.db.models import User, Profile, Resume, Job, MatchScore, JobSource
 from backend.config import get_settings
 from backend.services.portfolio import load_portfolio_profile
 from backend.schemas.matching import ScoreBreakdown
@@ -20,6 +20,31 @@ WEIGHTS = {
     "salary_fit": 0.10,
     "remote_fit": 0.10,
 }
+
+ENTRY_LEVEL_TERMS = (
+    "entry level",
+    "entry-level",
+    "junior",
+    "graduate",
+    "trainee",
+    "apprentice",
+    "intern",
+    "assistant",
+    "associate",
+)
+
+SENIOR_TERMS = (
+    "senior",
+    "staff",
+    "principal",
+    "lead",
+    "manager",
+    "director",
+    "vp",
+    "executive",
+    "head",
+    "architect",
+)
 
 
 def normalize_title(title: str) -> list[str]:
@@ -45,6 +70,21 @@ def calculate_title_similarity(profile_roles: list[str], job_title: str) -> floa
     return min(max_overlap * 100, 100.0)
 
 
+def calculate_keyword_fit(keywords: list[str], text: str) -> float:
+    if not keywords or not text:
+        return 0.0
+
+    text_lower = text.lower()
+    matched = 0
+
+    for keyword in keywords:
+        keyword_lower = keyword.lower().strip()
+        if keyword_lower and keyword_lower in text_lower:
+            matched += 1
+
+    return min((matched / len(keywords)) * 100, 100.0)
+
+
 def calculate_skill_match(user_skills: list[str], job_skills: list[str]) -> float:
     if not job_skills:
         return 50.0
@@ -59,10 +99,17 @@ def calculate_skill_match(user_skills: list[str], job_skills: list[str]) -> floa
     return min((overlap / len(job_skills_lower)) * 100, 100.0)
 
 
-def calculate_seniority_fit(profile_seniority: str | None, job_seniority: str | None) -> float:
-    if not profile_seniority or not job_seniority:
-        return 50.0
-    
+def _text_has_any(text: str, terms: Sequence[str]) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in terms)
+
+
+def calculate_seniority_fit(
+    profile_seniority: str | None,
+    job_seniority: str | None,
+    job_title: str = "",
+    job_description: str = "",
+) -> float:
     seniority_levels = {
         "intern": 1,
         "junior": 2,
@@ -76,12 +123,31 @@ def calculate_seniority_fit(profile_seniority: str | None, job_seniority: str | 
         "vp": 8,
         "executive": 9,
     }
-    
+
+    if not profile_seniority or not job_seniority:
+        if profile_seniority and profile_seniority.lower() in ("intern", "junior"):
+            job_text = f"{job_title} {job_description}".strip()
+            if _text_has_any(job_text, ENTRY_LEVEL_TERMS):
+                return 100.0
+            if _text_has_any(job_text, SENIOR_TERMS):
+                return 0.0
+        return 50.0
+
     profile_level = seniority_levels.get(profile_seniority.lower(), 3)
     job_level = seniority_levels.get(job_seniority.lower(), 3)
-    
+
     diff = abs(profile_level - job_level)
-    
+
+    if profile_level <= 2:
+        job_text = f"{job_title} {job_description}".strip()
+        if _text_has_any(job_text, ENTRY_LEVEL_TERMS) or job_level <= 2:
+            return 100.0
+        if _text_has_any(job_text, SENIOR_TERMS) or job_level >= 4:
+            return 0.0
+        if job_level == 3:
+            return 60.0
+        return 50.0
+
     if diff == 0:
         return 100.0
     elif diff == 1:
@@ -182,6 +248,16 @@ def score_job(
         profile.get("target_roles", []),
         job.get("title", ""),
     )
+    if portfolio_mode:
+        portfolio_focus = (
+            profile.get("target_roles", [])
+            + profile.get("core_skills", [])
+        )
+        keyword_fit = calculate_keyword_fit(
+            portfolio_focus,
+            f"{job.get('title', '')} {job.get('description', '')}",
+        )
+        title_similarity = max(title_similarity, keyword_fit)
     if portfolio_mode and not profile.get("target_roles"):
         title_similarity = 75.0
     
@@ -195,6 +271,8 @@ def score_job(
     seniority_fit = calculate_seniority_fit(
         profile.get("seniority"),
         job.get("seniority"),
+        job.get("title", ""),
+        job.get("description", ""),
     )
     
     location_fit = calculate_location_fit(
@@ -276,6 +354,9 @@ class MatchingService:
     async def get_user_skills(self, user_id: uuid.UUID) -> list[str]:
         from sqlalchemy import select
         from backend.db.models import Resume
+
+        settings = get_settings()
+        portfolio_profile = load_portfolio_profile(settings.portfolio_path)
         
         result = await self.session.execute(
             select(Resume).where(
@@ -292,9 +373,11 @@ class MatchingService:
             resume = result.scalar_one_or_none()
         
         if resume and resume.parsed_json:
-            return resume.parsed_json.get("skills", [])
-        
-        return []
+            skills = resume.parsed_json.get("skills", [])
+            if skills:
+                return list(dict.fromkeys(skills + portfolio_profile.get("core_skills", [])))
+
+        return portfolio_profile.get("core_skills", [])
     
     async def score_job_for_user(
         self,
@@ -320,6 +403,7 @@ class MatchingService:
         
         job_dict = {
             "title": job.title,
+            "description": job.description,
             "skills_required": job.skills_required or [],
             "seniority": job.seniority,
             "location": job.location,
@@ -376,6 +460,7 @@ class MatchingService:
         for job in jobs:
             job_dict = {
                 "title": job.title,
+                "description": job.description,
                 "skills_required": job.skills_required or [],
                 "seniority": job.seniority,
                 "location": job.location,
@@ -425,13 +510,14 @@ class MatchingService:
         remote_type: str | None = None,
     ) -> tuple[list[dict], int]:
         from sqlalchemy import select, func
-        from backend.db.models import Job, MatchScore
+        from backend.db.models import Job, MatchScore, JobSource
 
         profile = await self.get_user_profile(user_id)
         salary_floor = profile.get("salary_floor") if profile else None
         
         query = (
-            select(Job, MatchScore)
+            select(Job, MatchScore, JobSource)
+            .join(JobSource, Job.source_id == JobSource.id)
             .join(
                 MatchScore,
                 (Job.id == MatchScore.job_id) & (MatchScore.user_id == user_id),
@@ -465,10 +551,12 @@ class MatchingService:
         rows = result.all()
         
         jobs_with_scores = []
-        for job, match_score in rows:
+        for job, match_score, source in rows:
             job_dict = {
                 "job_id": job.id,
                 "source_job_id": job.source_job_id,
+                "source_name": source.name,
+                "source_url": job.source_url,
                 "company": job.company,
                 "title": job.title,
                 "location": job.location,

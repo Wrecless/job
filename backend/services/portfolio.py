@@ -21,11 +21,17 @@ def load_portfolio_profile(portfolio_path: str) -> dict:
             sections[current_section].append(line[2:].strip())
 
     job_target = sections.get("job target", [])
+    target_roles = sections.get("target roles", [])
+    core_skills = sections.get("core skills to match", [])
+    positioning = sections.get("positioning", [])
+    linkedin_headline = sections.get("linkedin headline", [])
+    linkedin_about = sections.get("linkedin about", [])
     matching_rules = sections.get("matching rules", [])
     source_filters = sections.get("source filters", [])
     notification_preferences = sections.get("notification preferences", [])
     prepare_everything = sections.get('what "prepare everything" means', [])
     bot_behavior = sections.get("bot behavior", [])
+    seniority_preference = sections.get("seniority preference", [])
 
     source_types_include: list[str] = []
     source_types_exclude: list[str] = []
@@ -45,11 +51,20 @@ def load_portfolio_profile(portfolio_path: str) -> dict:
 
     salary_floor_gbp = 23837
 
+    seniority = None
+    if seniority_preference:
+        seniority_text = " ".join(seniority_preference).lower()
+        if "entry" in seniority_text or "junior" in seniority_text:
+            seniority = "junior"
+        elif "intern" in seniority_text or "graduate" in seniority_text:
+            seniority = "intern"
+
     return {
         "source": "portfolio",
-        "headline": "Fully remote jobs only",
-        "target_roles": [],
-        "seniority": None,
+        "headline": linkedin_headline[0] if linkedin_headline else (positioning[0] if positioning else "Fully remote jobs only"),
+        "target_roles": target_roles,
+        "core_skills": core_skills,
+        "seniority": seniority,
         "salary_floor": salary_floor_gbp,
         "locations": ["Remote", "United Kingdom", "UK"],
         "remote_preference": "remote",
@@ -68,4 +83,5 @@ def load_portfolio_profile(portfolio_path: str) -> dict:
         "notification_preferences": notification_preferences,
         "preparation_rules": prepare_everything,
         "bot_behavior": bot_behavior,
+        "linkedin_about": linkedin_about,
     }

@@ -11,6 +11,8 @@ from backend.schemas.application import (
     ApplicationPipeline,
     ApplicationListResponse,
 )
+from backend.schemas.bot import BotRunResponse
+from backend.schemas.source import SourceCreate, SourceUpdate, SourceResponse, SourceListResponse
 
 __all__ = [
     "ScoreBreakdown",
@@ -22,4 +24,9 @@ __all__ = [
     "ApplicationWithJob",
     "ApplicationPipeline",
     "ApplicationListResponse",
+    "BotRunResponse",
+    "SourceCreate",
+    "SourceUpdate",
+    "SourceResponse",
+    "SourceListResponse",
 ]

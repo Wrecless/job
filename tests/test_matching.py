@@ -86,11 +86,19 @@ class TestSeniorityFit:
 
     def test_two_levels_diff(self):
         result = calculate_seniority_fit("junior", "senior")
-        assert result == 50.0
+        assert result == 0.0
 
     def test_ignore_case(self):
         result = calculate_seniority_fit("SENIOR", "Senior")
         assert result == 100.0
+
+    def test_entry_level_role_prefers_junior_jobs(self):
+        result = calculate_seniority_fit("junior", None, "Junior Support Engineer", "Entry level support role")
+        assert result == 100.0
+
+    def test_entry_level_role_rejects_senior_jobs(self):
+        result = calculate_seniority_fit("junior", "senior", "Senior Software Engineer", "Lead role")
+        assert result == 0.0
 
 
 class TestLocationFit:
@@ -236,6 +244,42 @@ class TestScoreJob:
         onsite_score, _, _ = score_job(profile, onsite_job, [])
 
         assert remote_score > onsite_score
+
+    def test_portfolio_keywords_boost_relevant_roles(self):
+        profile = {
+            "source": "portfolio",
+            "target_roles": ["Remote Python Tutor", "Technical Trainer"],
+            "core_skills": ["Python", "Curriculum development", "Educational technology"],
+            "seniority": None,
+            "salary_floor": 35000,
+            "locations": ["Remote", "UK"],
+            "remote_preference": "remote",
+        }
+        relevant_job = {
+            "title": "Remote Python Tutor",
+            "description": "Teach Python, build curriculum, and support learners online.",
+            "skills_required": ["Python", "Teaching"],
+            "seniority": None,
+            "location": "Remote",
+            "salary_min": 40000,
+            "salary_max": 50000,
+            "remote_type": "remote",
+        }
+        unrelated_job = {
+            "title": "Senior Backend Engineer",
+            "description": "Build infrastructure and services.",
+            "skills_required": ["Go", "Kubernetes"],
+            "seniority": "senior",
+            "location": "Remote",
+            "salary_min": 40000,
+            "salary_max": 50000,
+            "remote_type": "remote",
+        }
+
+        relevant_score, _, _ = score_job(profile, relevant_job, ["Python", "Teaching"])
+        unrelated_score, _, _ = score_job(profile, unrelated_job, ["Go", "Kubernetes"])
+
+        assert relevant_score > unrelated_score
 
 
 class TestMatchingService:
@@ -394,6 +438,8 @@ class TestMatchingService:
         
         assert total == 2
         assert len(jobs) == 2
+        assert jobs[0]["source_name"] == "TestSource2"
+        assert jobs[0]["source_url"] == "https://test.com/1"
         assert jobs[0]["score_total"] == 85.0
         assert jobs[1]["score_total"] == 45.0
 
@@ -404,9 +450,20 @@ class TestPortfolioLoader:
         portfolio.write_text(
             """# Portfolio
 
+## Target Roles
+- Remote Computer Science Teacher
+- Remote Python Tutor
+
+## Core Skills To Match
+- Python
+- Curriculum development
+
 ## Job Target
 - Fully remote only
 - Prefer companies in the UK
+
+## Seniority Preference
+- Entry level / junior
 
 ## Source Filters
 - Include source types: greenhouse, lever, ashby
@@ -421,6 +478,9 @@ class TestPortfolioLoader:
 
         assert profile["source"] == "portfolio"
         assert profile["remote_preference"] == "remote"
+        assert profile["seniority"] == "junior"
+        assert "Remote Python Tutor" in profile["target_roles"]
+        assert "Python" in profile["core_skills"]
         assert profile["salary_policy"] == "uk_or_above"
         assert profile["source_types_include"] == ["greenhouse", "lever", "ashby"]
         assert "Fully remote only" in profile["job_target"]
